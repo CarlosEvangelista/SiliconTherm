@@ -22,13 +22,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -55,7 +55,7 @@ jobs:
           shasum -a 256 "dist/${ARCHIVE}" | awk '{print $1}' > "dist/${ARCHIVE}.sha256"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-${{ matrix.target }}
           path: dist/*
@@ -67,7 +67,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-*
           merge-multiple: true
