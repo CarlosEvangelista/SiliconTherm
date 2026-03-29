@@ -33,11 +33,13 @@ where
 
 #[test]
 fn apply_derived_fields_computes_charge_power_and_availability() {
-    let mut stats = BatteryStats::default();
-    stats.current_capacity_mah = 63;
-    stats.max_capacity_mah = 100;
-    stats.voltage_mv = 11_800;
-    stats.amperage_ma = -500;
+    let mut stats = BatteryStats {
+        current_capacity_mah: 63,
+        max_capacity_mah: 100,
+        voltage_mv: 11_800,
+        amperage_ma: -500,
+        ..Default::default()
+    };
 
     battery_apply_derived_fields(&mut stats);
 
@@ -50,9 +52,11 @@ fn apply_derived_fields_computes_charge_power_and_availability() {
 fn session_discharge_accumulates_only_while_discharging() {
     let start = Instant::now();
     let mut state = SessionState::default();
-    let mut stats = BatteryStats::default();
-    stats.voltage_mv = 12_000;
-    stats.amperage_ma = -1_000;
+    let mut stats = BatteryStats {
+        voltage_mv: 12_000,
+        amperage_ma: -1_000,
+        ..Default::default()
+    };
 
     battery_update_session_discharge_with_state(&mut state, &mut stats, start);
     assert_close(0.0, stats.session_discharged_mwh);
@@ -149,7 +153,11 @@ fn read_stats_with_sources_accumulates_session_between_calls() {
 
     let mut state = SessionState::default();
     let start = Instant::now();
-    let mut stats = BatteryStats::default();
+    let mut stats = BatteryStats {
+        voltage_mv: 12_000,
+        amperage_ma: -1_000,
+        ..Default::default()
+    };
 
     battery_read_stats_with_sources_and_state(&mut stats, &sources, start, &mut state);
     assert_close(0.0, stats.session_discharged_mwh);

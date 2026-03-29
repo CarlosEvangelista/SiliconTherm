@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 CarlosEvangelista
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SensorSection {
+    #[default]
     Cpu = 0,
     Gpu = 1,
     Battery = 2,
@@ -12,12 +13,6 @@ pub const WATCHTEMP_SENSOR_MIN_VALID_C: f64 = 5.0;
 pub const WATCHTEMP_SENSOR_MAX_VALID_C: f64 = 130.0;
 pub const WATCHTEMP_SENSOR_MAX_RETRIES: i32 = 15;
 pub const WATCHTEMP_SENSOR_RETRY_DELAY_US: u64 = 20_000;
-
-impl Default for SensorSection {
-    fn default() -> Self {
-        Self::Cpu
-    }
-}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SensorEntry {

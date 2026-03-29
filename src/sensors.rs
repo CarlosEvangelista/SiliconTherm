@@ -748,6 +748,14 @@ fn sleep_retry(retry_delay_us: u64) {
     }
 }
 
+#[derive(Clone, Copy)]
+struct SensorReadConfig {
+    retries: i32,
+    retry_delay_us: u64,
+    min_valid: f64,
+    max_valid: f64,
+}
+
 pub fn sensor_read_temperature_retry(
     ctx: &SmcContext,
     entry: &mut SensorEntry,
@@ -802,10 +810,7 @@ fn try_register_sensor(
     collection: &mut SensorCollection,
     key: &str,
     is_apple_silicon: bool,
-    retries: i32,
-    retry_delay_us: u64,
-    min_valid: f64,
-    max_valid: f64,
+    read_config: SensorReadConfig,
 ) -> bool {
     if !is_candidate_temp_key(key) || contains_key(collection, key) {
         return true;
@@ -826,10 +831,10 @@ fn try_register_sensor(
     if !sensor_read_temperature_retry(
         ctx,
         &mut entry,
-        retries,
-        retry_delay_us,
-        min_valid,
-        max_valid,
+        read_config.retries,
+        read_config.retry_delay_us,
+        read_config.min_valid,
+        read_config.max_valid,
     ) {
         return true;
     }
@@ -848,6 +853,13 @@ fn discover_profile_first(
     min_valid: f64,
     max_valid: f64,
 ) -> bool {
+    let read_config = SensorReadConfig {
+        retries,
+        retry_delay_us,
+        min_valid,
+        max_valid,
+    };
+
     let profile = if is_apple_silicon {
         APPLE_PROFILE
     } else {
@@ -855,16 +867,7 @@ fn discover_profile_first(
     };
 
     for known in profile {
-        if !try_register_sensor(
-            ctx,
-            collection,
-            known.key,
-            is_apple_silicon,
-            retries,
-            retry_delay_us,
-            min_valid,
-            max_valid,
-        ) {
+        if !try_register_sensor(ctx, collection, known.key, is_apple_silicon, read_config) {
             return false;
         }
     }
@@ -881,6 +884,13 @@ fn discover_from_smc_keyspace(
     min_valid: f64,
     max_valid: f64,
 ) -> bool {
+    let read_config = SensorReadConfig {
+        retries,
+        retry_delay_us,
+        min_valid,
+        max_valid,
+    };
+
     let mut key_count = 0u32;
     if !smc_read_key_count(ctx, &mut key_count) || key_count == 0 || key_count > 100_000 {
         return true;
@@ -893,16 +903,7 @@ fn discover_from_smc_keyspace(
         }
 
         let key = String::from_utf8_lossy(&key_raw[..4]).to_string();
-        if !try_register_sensor(
-            ctx,
-            collection,
-            &key,
-            is_apple_silicon,
-            retries,
-            retry_delay_us,
-            min_valid,
-            max_valid,
-        ) {
+        if !try_register_sensor(ctx, collection, &key, is_apple_silicon, read_config) {
             return false;
         }
     }

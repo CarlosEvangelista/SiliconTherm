@@ -116,7 +116,7 @@ fn cf_dict_get_int(dict: CFDictionaryRef, key: CFStringRef) -> Option<i32> {
     }
 
     // SAFETY: dict/key are valid CoreFoundation objects for this lookup.
-    let value = unsafe { CFDictionaryGetValue(dict, key as *const c_void) };
+    let value = unsafe { CFDictionaryGetValue(dict, key) };
     if value.is_null() {
         return None;
     }
@@ -151,7 +151,7 @@ fn cf_dict_get_bool(dict: CFDictionaryRef, key: CFStringRef) -> Option<bool> {
     }
 
     // SAFETY: dict/key are valid CoreFoundation objects for this lookup.
-    let value = unsafe { CFDictionaryGetValue(dict, key as *const c_void) };
+    let value = unsafe { CFDictionaryGetValue(dict, key) };
     if value.is_null() {
         return None;
     }
