@@ -106,3 +106,6 @@ impl Default for BatteryStats {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

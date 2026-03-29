@@ -176,10 +176,31 @@ fn cf_dict_get_bool_by_name(dict: CFDictionaryRef, key_name: &str) -> Option<boo
     with_cf_string_key(key_name, |key| cf_dict_get_bool(dict, key)).flatten()
 }
 
-fn battery_update_session_discharge(stats: &mut BatteryStats) {
-    let now = Instant::now();
-    let mut state = session_state().lock().expect("session mutex poisoned");
+trait BatteryDataSource {
+    fn read_into(&self, stats: &mut BatteryStats);
+}
 
+struct RegistryBatterySource;
+
+impl BatteryDataSource for RegistryBatterySource {
+    fn read_into(&self, stats: &mut BatteryStats) {
+        battery_read_from_registry(stats);
+    }
+}
+
+struct IopsBatterySource;
+
+impl BatteryDataSource for IopsBatterySource {
+    fn read_into(&self, stats: &mut BatteryStats) {
+        battery_read_from_iops(stats);
+    }
+}
+
+fn battery_update_session_discharge_with_state(
+    state: &mut SessionState,
+    stats: &mut BatteryStats,
+    now: Instant,
+) {
     if let Some(last) = state.last_sample {
         let elapsed_seconds = now.duration_since(last).as_secs_f64();
         if elapsed_seconds > 0.0 && stats.voltage_mv > 0 && stats.amperage_ma < 0 {
@@ -319,17 +340,7 @@ pub fn battery_reader_reset_session() {
     state.last_sample = None;
 }
 
-pub fn battery_read_stats(stats: &mut BatteryStats) {
-    *stats = BatteryStats::default();
-
-    {
-        let state = session_state().lock().expect("session mutex poisoned");
-        stats.session_discharged_mwh = state.discharged_mwh;
-    }
-
-    battery_read_from_registry(stats);
-    battery_read_from_iops(stats);
-
+fn battery_apply_derived_fields(stats: &mut BatteryStats) {
     if stats.current_capacity_mah >= 0 && stats.max_capacity_mah > 0 {
         stats.charge_percent =
             100.0 * stats.current_capacity_mah as f64 / stats.max_capacity_mah as f64;
@@ -340,5 +351,40 @@ pub fn battery_read_stats(stats: &mut BatteryStats) {
     }
 
     stats.available = stats.max_capacity_mah > 0 || stats.voltage_mv > 0;
-    battery_update_session_discharge(stats);
 }
+
+fn battery_read_stats_with_sources_and_state(
+    stats: &mut BatteryStats,
+    sources: &[&dyn BatteryDataSource],
+    now: Instant,
+    state: &mut SessionState,
+) {
+    *stats = BatteryStats::default();
+    stats.session_discharged_mwh = state.discharged_mwh;
+
+    for source in sources {
+        source.read_into(stats);
+    }
+
+    battery_apply_derived_fields(stats);
+    battery_update_session_discharge_with_state(state, stats, now);
+}
+
+fn battery_read_stats_with_sources_at(
+    stats: &mut BatteryStats,
+    sources: &[&dyn BatteryDataSource],
+    now: Instant,
+) {
+    let mut state = session_state().lock().expect("session mutex poisoned");
+    battery_read_stats_with_sources_and_state(stats, sources, now, &mut state);
+}
+
+pub fn battery_read_stats(stats: &mut BatteryStats) {
+    let registry = RegistryBatterySource;
+    let iops = IopsBatterySource;
+    let sources: [&dyn BatteryDataSource; 2] = [&registry, &iops];
+    battery_read_stats_with_sources_at(stats, &sources, Instant::now());
+}
+
+#[cfg(test)]
+mod tests;
