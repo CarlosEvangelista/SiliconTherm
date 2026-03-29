@@ -1,0 +1,72 @@
+name: Coverage
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Test Coverage
+    runs-on: macos-14
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Generate lcov report
+        run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info --locked
+
+      - name: Print coverage summary
+        run: cargo llvm-cov report --summary-only
+
+      - name: Install diff-cover in venv
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python3 -m pip install --upgrade pip
+          python3 -m pip install diff-cover
+          echo "${GITHUB_WORKSPACE}/.venv/bin" >> "${GITHUB_PATH}"
+
+      - name: Enforce patch coverage >= 80%
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          COMPARE_BRANCH: origin/${{ github.base_ref }}
+        run: |
+          diff-cover lcov.info \
+            --compare-branch "${COMPARE_BRANCH}" \
+            --fail-under=80 \
+            --total-percent-float
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-lcov
+          path: lcov.info
